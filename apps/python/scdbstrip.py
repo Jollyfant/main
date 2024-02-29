@@ -812,76 +812,77 @@ Remove all waveform QC paramters older than 30 days but do not effect event para
             if not self._stripEP:
                 return True
 
-            # treat event parameters
-            old_events = (
-                "\
-      create temporary table old_events as \
-        select Event._oid, PEvent.%s \
-        from Event, PublicObject as PEvent, Origin, PublicObject as POrigin \
-        where Event._oid=PEvent._oid and \
-              Origin._oid=POrigin._oid and \
-              Event.%s=POrigin.%s and \
-              %s\
-      "
-                % (
-                    self.cnvCol("publicID"),
-                    self.cnvCol("preferredOriginID"),
-                    self.cnvCol("publicID"),
-                    timeRangeSelection("%s.%s" % ("Origin", self.cnvCol("time_value"))),
+            if True:
+                # treat event parameters
+                old_events = (
+                    "\
+          create temporary table old_events as \
+            select Event._oid, PEvent.%s \
+            from Event, PublicObject as PEvent, Origin, PublicObject as POrigin \
+            where Event._oid=PEvent._oid and \
+                  Origin._oid=POrigin._oid and \
+                  Event.%s=POrigin.%s and \
+                  %s\
+          "
+                    % (
+                        self.cnvCol("publicID"),
+                        self.cnvCol("preferredOriginID"),
+                        self.cnvCol("publicID"),
+                        timeRangeSelection("%s.%s" % ("Origin", self.cnvCol("time_value"))),
+                    )
                 )
-            )
-
-            if len(self._keepEvents) > 0:
-                old_events += (
-                    " and PEvent."
-                    + self.cnvCol("publicID")
-                    + " not in ('%s')" % "','".join(self._keepEvents)
+    
+                if len(self._keepEvents) > 0:
+                    old_events += (
+                        " and PEvent."
+                        + self.cnvCol("publicID")
+                        + " not in ('%s')" % "','".join(self._keepEvents)
+                    )
+    
+                self.beginMessage("Find old events")
+                if not self.runCommand(old_events):
+                    return False
+                self.endMessage(self.globalCount("old_events"))
+    
+                # Delete OriginReferences of old events
+                self.delete(
+                    "Delete origin references of old events",
+                    self.deleteChilds,
+                    "OriginReference",
+                    "old_events",
                 )
-
-            self.beginMessage("Find old events")
-            if not self.runCommand(old_events):
-                return False
-            self.endMessage(self.globalCount("old_events"))
-
-            # Delete OriginReferences of old events
-            self.delete(
-                "Delete origin references of old events",
-                self.deleteChilds,
-                "OriginReference",
-                "old_events",
-            )
-
-            # Delete FocalMechanismReference of old events
-            self.delete(
-                "Delete focal mechanism references of old events",
-                self.deleteChilds,
-                "FocalMechanismReference",
-                "old_events",
-            )
-
-            # Delete EventDescription of old events
-            self.delete(
-                "Delete event descriptions of old events",
-                self.deleteChilds,
-                "EventDescription",
-                "old_events",
-            )
-
-            # Delete Comments of old events
-            self.delete(
-                "Delete comments of old events",
-                self.deleteChilds,
-                "Comment",
-                "old_events",
-            )
-
-            # Delete old events
-            self.delete("Delete old events", self.deleteObjects, "Event", "old_events")
-
-            self.beginMessage("Cleaning up temporary results")
-            if not self.runCommand("drop table old_events"):
-                return False
-            self.endMessage()
+    
+                # Delete FocalMechanismReference of old events
+                self.delete(
+                    "Delete focal mechanism references of old events",
+                    self.deleteChilds,
+                    "FocalMechanismReference",
+                    "old_events",
+                )
+    
+                # Delete EventDescription of old events
+                self.delete(
+                    "Delete event descriptions of old events",
+                    self.deleteChilds,
+                    "EventDescription",
+                    "old_events",
+                )
+    
+                # Delete Comments of old events
+                self.delete(
+                    "Delete comments of old events",
+                    self.deleteChilds,
+                    "Comment",
+                    "old_events",
+                )
+    
+                # Delete old events
+                self.delete("Delete old events", self.deleteObjects, "Event", "old_events")
+    
+                self.beginMessage("Cleaning up temporary results")
+                if not self.runCommand("drop table old_events"):
+                    return False
+                self.endMessage()
 
             tmp_fm = (
                 "\
